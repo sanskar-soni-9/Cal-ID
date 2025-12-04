@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@calid/features/ui/components/button";
 import { Icon, type IconName } from "@calid/features/ui/components/icon";
 import { SkeletonText } from "@calid/features/ui/components/skeleton";
 import { useState, useEffect, useMemo } from "react";
@@ -11,6 +12,7 @@ import type { userMetadata } from "@calcom/prisma/zod-utils";
 import { trpc } from "@calcom/trpc";
 
 import { ShareModal } from "../utils/ShareModal";
+import { AnalyticsCard } from "./AnalyticsCard";
 
 type UserMetadata = z.infer<typeof userMetadata>;
 type GettingStartedActions = NonNullable<UserMetadata>["gettingStartedActions"];
@@ -105,6 +107,7 @@ export function GettingStarted({
   const gettingStartedActions = userMetadata?.gettingStartedActions;
   const [isMobile, setIsMobile] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -189,110 +192,141 @@ export function GettingStarted({
     <>
       <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} shareUrl={shareUrl} />
       <div className="border-default flex w-full flex-col items-center overflow-hidden rounded-md border px-4 py-6 sm:py-8">
-        <div className="mb-4 sm:mb-8">
-          <h2 className="text-default text-center text-lg font-bold">{t("lets_get_you_started")}</h2>
+        <div className="relative mb-4 flex w-full items-start justify-between sm:mb-8">
+          <div className="flex-1" />
+          <div className="text-default relative flex-1 text-center">
+            <h2
+              className={`text-lg font-bold transition-all duration-300 ${
+                showAnalytics ? "absolute inset-0 opacity-0" : "opacity-100"
+              }`}>
+              {t("lets_get_you_started")}
+            </h2>
+            <h2
+              className={`text-lg font-bold transition-all duration-300 ${
+                showAnalytics ? "opacity-100" : "absolute inset-0 opacity-0"
+              }`}>
+              {t("analytics")}
+            </h2>
+          </div>
+          <div className="flex flex-1 justify-end">
+            <Button color="secondary" onClick={() => setShowAnalytics(!showAnalytics)}>
+              {showAnalytics ? t("getting_started") || "Getting Started" : t("analytics")}
+            </Button>
+          </div>
         </div>
 
-        {isLoading ? (
-          <Skeleton />
-        ) : (
-          <div className="flex w-full max-w-4xl flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
-            <div className="relative flex-shrink-0">
-              <svg className="h-32 w-32 sm:h-40 sm:w-40" viewBox="0 0 160 160">
-                {stepsWithStatus.map((step, index) => {
-                  const isCompleted = step.status === "completed";
-                  const centerX = 80;
-                  const centerY = 80;
-                  const radius = 70;
-                  const segmentAngle = 72;
-                  const startAngle = -90 + index * segmentAngle;
-                  const endAngle = startAngle + segmentAngle;
+        <div className="relative min-h-[200px] w-full">
+          {showAnalytics ? (
+            <div key="analytics" className="animate-fade-in-up">
+              <AnalyticsCard />
+            </div>
+          ) : isLoading ? (
+            <div key="loading" className="animate-fade-in-up">
+              <Skeleton />
+            </div>
+          ) : (
+            <div key="getting-started" className="animate-fade-in-up">
+              <div className="flex w-full max-w-4xl flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
+                <div className="relative flex-shrink-0">
+                  <svg className="h-32 w-32 sm:h-40 sm:w-40" viewBox="0 0 160 160">
+                    {stepsWithStatus.map((step, index) => {
+                      const isCompleted = step.status === "completed";
+                      const centerX = 80;
+                      const centerY = 80;
+                      const radius = 70;
+                      const segmentAngle = 72;
+                      const startAngle = -90 + index * segmentAngle;
+                      const endAngle = startAngle + segmentAngle;
 
-                  const startRad = (startAngle * Math.PI) / 180;
-                  const endRad = (endAngle * Math.PI) / 180;
+                      const startRad = (startAngle * Math.PI) / 180;
+                      const endRad = (endAngle * Math.PI) / 180;
 
-                  const x1 = centerX + radius * Math.cos(startRad);
-                  const y1 = centerY + radius * Math.sin(startRad);
-                  const x2 = centerX + radius * Math.cos(endRad);
-                  const y2 = centerY + radius * Math.sin(endRad);
+                      const x1 = centerX + radius * Math.cos(startRad);
+                      const y1 = centerY + radius * Math.sin(startRad);
+                      const x2 = centerX + radius * Math.cos(endRad);
+                      const y2 = centerY + radius * Math.sin(endRad);
 
-                  const largeArcFlag = segmentAngle > 180 ? 1 : 0;
+                      const largeArcFlag = segmentAngle > 180 ? 1 : 0;
 
-                  const pathData = `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
+                      const pathData = `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
 
-                  const arcLength = (2 * Math.PI * radius * segmentAngle) / 360;
-                  const dotSize = 4;
-                  const gapSize = 8;
-                  const dashArray = `${dotSize} ${gapSize}`;
+                      const arcLength = (2 * Math.PI * radius * segmentAngle) / 360;
+                      const dotSize = 4;
+                      const gapSize = 8;
+                      const dashArray = `${dotSize} ${gapSize}`;
 
-                  return (
-                    <path
-                      key={step.number}
-                      d={pathData}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="6"
-                      strokeDasharray={dashArray}
-                      strokeLinecap="round"
-                      className={isCompleted ? "text-active dark:text-muted" : "text-muted dark:text-black"}
-                    />
-                  );
-                })}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-default text-2xl font-bold sm:text-3xl">
-                  {Math.round((completedSteps / totalSteps) * 100)}%
-                </span>
-                <span className="text-default text-xs sm:text-sm">{t("complete")}</span>
+                      return (
+                        <path
+                          key={step.number}
+                          d={pathData}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          strokeDasharray={dashArray}
+                          strokeLinecap="round"
+                          className={
+                            isCompleted ? "text-active dark:text-muted" : "text-muted dark:text-black"
+                          }
+                        />
+                      );
+                    })}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-default text-2xl font-bold sm:text-3xl">
+                      {Math.round((completedSteps / totalSteps) * 100)}%
+                    </span>
+                    <span className="text-default text-xs sm:text-sm">{t("complete")}</span>
+                  </div>
+                </div>
+
+                <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto">
+                  {stepsWithStatus.map((step, index) => {
+                    const isCompleted = step.status === "completed";
+
+                    return (
+                      <div
+                        key={step.number}
+                        className="relative flex w-full items-center"
+                        style={{
+                          transform: !isMobile && step.translateX ? `translateX(${step.translateX})` : "none",
+                        }}>
+                        {isCompleted ? (
+                          <div
+                            className="border-default relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-full border bg-blue-500 p-2 transition-all duration-300 hover:scale-105 dark:bg-black"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStepClick(step);
+                            }}>
+                            <div className="border-default pointer-events-none flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border bg-white p-2">
+                              <Icon name="check" className="text-default dark:text-black" />
+                            </div>
+                            <span className="pointer-events-none truncate font-medium text-white dark:text-white">
+                              {step.title}
+                            </span>
+                          </div>
+                        ) : (
+                          <div
+                            className="bg-muted border-default border-default relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-full border border p-2 transition-all duration-300 hover:scale-105"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStepClick(step);
+                            }}>
+                            <div className="bg-default pointer-events-none flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-2">
+                              <Icon name={step.icon} className="text-brand-default" />
+                            </div>
+                            <span className="text-default pointer-events-none truncate font-medium">
+                              {step.title}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto">
-              {stepsWithStatus.map((step, index) => {
-                const isCompleted = step.status === "completed";
-
-                return (
-                  <div
-                    key={step.number}
-                    className="relative flex w-full items-center"
-                    style={{
-                      transform: !isMobile && step.translateX ? `translateX(${step.translateX})` : "none",
-                    }}>
-                    {isCompleted ? (
-                      <div
-                        className="border-default relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-full border bg-blue-500 p-2 transition-all duration-300 hover:scale-105 dark:bg-black"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStepClick(step);
-                        }}>
-                        <div className="border-default pointer-events-none flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border bg-white p-2">
-                          <Icon name="check" className="text-default dark:text-black" />
-                        </div>
-                        <span className="pointer-events-none truncate font-medium text-white dark:text-white">
-                          {step.title}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className="bg-muted border-default border-default relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-full border border p-2 transition-all duration-300 hover:scale-105"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStepClick(step);
-                        }}>
-                        <div className="bg-default pointer-events-none flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-2">
-                          <Icon name={step.icon} className="text-brand-default" />
-                        </div>
-                        <span className="text-default pointer-events-none truncate font-medium">
-                          {step.title}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </>
   );
