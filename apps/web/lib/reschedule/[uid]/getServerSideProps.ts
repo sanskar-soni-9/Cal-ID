@@ -124,14 +124,15 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     profileEnrichedBookingUser: enrichedBookingUser,
   });
 
-  const isForcedRescheduleForCancelledBooking = allowRescheduleForCancelledBooking;
   // If booking is already REJECTED, we can't reschedule this booking. Take the user to the booking page which would show it's correct status and other details.
   // If the booking is CANCELLED and allowRescheduleForCancelledBooking is false, we redirect the user to the original event link.
   // A booking that has been rescheduled to a new booking will also have a status of CANCELLED
   const isDisabledRescheduling = booking.eventType?.disableRescheduling;
   // This comes from query param and thus is considered forced
+
   const canBookThroughCancelledBookingRescheduleLink = booking.eventType?.allowReschedulingCancelledBookings;
-  const isNonRescheduleableBooking = booking.status === BookingStatus.REJECTED;
+  const isNonRescheduleableBooking =
+    booking.status === BookingStatus.REJECTED || booking.status === BookingStatus.CANCELLED;
 
   if (isDisabledRescheduling) {
     return {
@@ -142,12 +143,22 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  if (isNonRescheduleableBooking && !isForcedRescheduleForCancelledBooking) {
-    const canReschedule =
-      booking.status === BookingStatus.CANCELLED && canBookThroughCancelledBookingRescheduleLink;
+  const canReschedule =
+    booking.status === BookingStatus.CANCELLED && canBookThroughCancelledBookingRescheduleLink;
+
+  if (canReschedule) {
     return {
       redirect: {
-        destination: canReschedule ? eventUrl : `/booking/${uid}`,
+        destination: eventUrl,
+        permanent: false,
+      },
+    };
+  }
+
+  if (isNonRescheduleableBooking) {
+    return {
+      redirect: {
+        destination: `/booking/${uid}`,
         permanent: false,
       },
     };
