@@ -1,4 +1,6 @@
-{
+{ 
+  "contacts":"Contacts",
+  "contacts_description":"Manage your contacts and schedule meetings",
   "background_jobs": "Background Jobs",
   "background_jobs_description": "Dashboard for monitoring bullmq background jobs",
   "third_party_services": "Third Party Service Providers",
