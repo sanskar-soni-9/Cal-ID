@@ -15,8 +15,11 @@ import { ContactProfileCard } from "../components/ContactProfileCard";
 import { MeetingsSection } from "../components/MeetingsSection";
 import { ScheduleMeetingModal } from "../components/ScheduleMeetingModal";
 import { ShareAvailabilityModal } from "../components/ShareAvailabilityModal";
-import { mapContactDraftToUpdateInput, mapContactRowToContact } from "../mappers/contactMappers";
-import { mockMeetings } from "../mock-data/contactsMockData";
+import {
+  mapContactDraftToUpdateInput,
+  mapContactMeetingRowToContactMeeting,
+  mapContactRowToContact,
+} from "../mappers/contactMappers";
 import type { ContactDraft } from "../types";
 
 interface ContactDetailPageProps {
@@ -45,12 +48,22 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
     [contactQuery.data]
   );
 
+  const meetingsQuery = trpc.viewer.calIdContacts.getMeetingsByContactId.useQuery(
+    {
+      contactId: numericContactId,
+    },
+    {
+      enabled: hasValidContactId && Boolean(contactQuery.data),
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const meetings = useMemo(
     () =>
-      mockMeetings
-        .filter((meeting) => meeting.contactId === numericContactId)
+      (meetingsQuery.data?.rows ?? [])
+        .map((meeting) => mapContactMeetingRowToContactMeeting(numericContactId, meeting))
         .sort((first, second) => second.date.getTime() - first.date.getTime()),
-    [numericContactId]
+    [meetingsQuery.data?.rows, numericContactId]
   );
 
   const upcomingMeetings = meetings.filter((meeting) => meeting.status === "upcoming");
@@ -220,8 +233,10 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
               </>
             }
             meetings={upcomingMeetings}
-            emptyLabel="No upcoming meetings"
+            emptyLabel="No upcoming meetings found for this contact"
             countBadge
+            isLoading={meetingsQuery.isLoading}
+            errorMessage={meetingsQuery.isError ? meetingsQuery.error.message : null}
           />
 
           <MeetingsSection
@@ -231,7 +246,9 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
               </>
             }
             meetings={pastMeetings}
-            emptyLabel="No past meetings"
+            emptyLabel="No meeting history found for this contact"
+            isLoading={meetingsQuery.isLoading}
+            errorMessage={meetingsQuery.isError ? meetingsQuery.error.message : null}
           />
         </div>
       </div>

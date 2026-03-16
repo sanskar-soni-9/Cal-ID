@@ -3,6 +3,7 @@ import { router } from "../../../trpc";
 import { ZCalIdContactsCreateInputSchema } from "./create.schema";
 import { ZCalIdContactsDeleteInputSchema } from "./delete.schema";
 import { ZCalIdContactsGetByIdInputSchema } from "./getById.schema";
+import { ZCalIdContactsGetMeetingsByContactIdInputSchema } from "./getMeetingsByContactId.schema";
 import { ZCalIdContactsListInputSchema } from "./list.schema";
 import { ZCalIdContactsUpdateInputSchema } from "./update.schema";
 
@@ -24,6 +25,17 @@ export const calIdContactsRouter = router({
       input,
     });
   }),
+
+  getMeetingsByContactId: authedProcedure
+    .input(ZCalIdContactsGetMeetingsByContactIdInputSchema)
+    .query(async ({ ctx, input }) => {
+      const { getMeetingsByContactIdCalIdContactsHandler } = await import("./getMeetingsByContactId.handler");
+
+      return getMeetingsByContactIdCalIdContactsHandler({
+        ctx,
+        input,
+      });
+    }),
 
   create: authedProcedure.input(ZCalIdContactsCreateInputSchema).mutation(async ({ ctx, input }) => {
     const { createCalIdContactsHandler } = await import("./create.handler");

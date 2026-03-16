@@ -26,6 +26,9 @@ export type ContactUpdateInput = RouterInputs["viewer"]["calIdContacts"]["update
 
 export type ContactListInput = RouterInputs["viewer"]["calIdContacts"]["list"];
 
+export type ContactMeetingsByContactIdInput =
+  RouterInputs["viewer"]["calIdContacts"]["getMeetingsByContactId"];
+
 export interface ContactDraft {
   id?: number;
   name: string;
@@ -42,7 +45,7 @@ export interface ContactsListMeta {
 }
 
 export interface ContactMeeting {
-  id: string;
+  id: number;
   contactId: number;
   title: string;
   date: Date;
@@ -51,6 +54,9 @@ export interface ContactMeeting {
   notes?: string;
   meetingLink?: string;
 }
+
+export type ContactMeetingRow =
+  RouterOutputs["viewer"]["calIdContacts"]["getMeetingsByContactId"]["rows"][number];
 
 export interface MeetingTypeOption {
   id: string;

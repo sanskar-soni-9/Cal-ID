@@ -1,4 +1,12 @@
-import type { Contact, ContactCreateInput, ContactDraft, ContactRow, ContactUpdateInput } from "../types";
+import type {
+  Contact,
+  ContactCreateInput,
+  ContactDraft,
+  ContactMeeting,
+  ContactMeetingRow,
+  ContactRow,
+  ContactUpdateInput,
+} from "../types";
 import { getContactInitials } from "../utils/contactUtils";
 
 const parseDate = (value: Date | string) => {
@@ -40,4 +48,18 @@ export const mapContactDraftToUpdateInput = (draft: ContactDraft): ContactUpdate
   email: draft.email.trim(),
   phone: draft.phone.trim(),
   notes: draft.notes.trim(),
+});
+
+export const mapContactMeetingRowToContactMeeting = (
+  contactId: number,
+  meeting: ContactMeetingRow
+): ContactMeeting => ({
+  id: meeting.id,
+  contactId,
+  title: meeting.title,
+  date: parseDate(meeting.date),
+  duration: meeting.duration,
+  status: meeting.status,
+  notes: meeting.notes ?? undefined,
+  meetingLink: meeting.meetingLink ?? undefined,
 });

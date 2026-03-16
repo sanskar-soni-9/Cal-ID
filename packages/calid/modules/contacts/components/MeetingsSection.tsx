@@ -9,6 +9,8 @@ interface MeetingsSectionProps {
   meetings: ContactMeeting[];
   emptyLabel: string;
   countBadge?: boolean;
+  isLoading?: boolean;
+  errorMessage?: string | null;
 }
 
 export const MeetingsSection = ({
@@ -16,6 +18,8 @@ export const MeetingsSection = ({
   meetings,
   emptyLabel,
   countBadge = false,
+  isLoading = false,
+  errorMessage = null,
 }: MeetingsSectionProps) => {
   return (
     <Card>
@@ -30,7 +34,11 @@ export const MeetingsSection = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {meetings.length === 0 ? (
+        {isLoading ? (
+          <p className="text-muted-foreground py-4 text-center text-sm">Loading meetings...</p>
+        ) : errorMessage ? (
+          <p className="text-destructive py-4 text-center text-sm">{errorMessage}</p>
+        ) : meetings.length === 0 ? (
           <p className="text-muted-foreground py-4 text-center text-sm">{emptyLabel}</p>
         ) : (
           <div className="space-y-2">

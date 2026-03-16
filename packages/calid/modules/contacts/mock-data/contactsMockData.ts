@@ -2,7 +2,7 @@ import type { ContactMeeting } from "../types";
 
 export const mockMeetings: ContactMeeting[] = [
   {
-    id: "m1",
+    id: 1,
     contactId: 1,
     title: "Quarterly Planning",
     date: new Date("2026-03-22T15:00:00.000Z"),
@@ -12,7 +12,7 @@ export const mockMeetings: ContactMeeting[] = [
     notes: "Discuss Q2 campaign timeline",
   },
   {
-    id: "m2",
+    id: 2,
     contactId: 1,
     title: "Kickoff Sync",
     date: new Date("2026-02-12T14:00:00.000Z"),
@@ -21,7 +21,7 @@ export const mockMeetings: ContactMeeting[] = [
     notes: "Aligned on goals and owners",
   },
   {
-    id: "m3",
+    id: 3,
     contactId: 1,
     title: "Demo Follow-up",
     date: new Date("2026-01-24T17:00:00.000Z"),
@@ -30,7 +30,7 @@ export const mockMeetings: ContactMeeting[] = [
     notes: "Rescheduled after budget review",
   },
   {
-    id: "m4",
+    id: 4,
     contactId: 2,
     title: "Solution Review",
     date: new Date("2026-03-28T16:30:00.000Z"),
@@ -39,7 +39,7 @@ export const mockMeetings: ContactMeeting[] = [
     meetingLink: "https://zoom.us/j/222333444",
   },
   {
-    id: "m5",
+    id: 5,
     contactId: 4,
     title: "Project Retrospective",
     date: new Date("2026-03-01T13:30:00.000Z"),
@@ -47,7 +47,7 @@ export const mockMeetings: ContactMeeting[] = [
     status: "completed",
   },
   {
-    id: "m6",
+    id: 6,
     contactId: 5,
     title: "Product Demo",
     date: new Date("2026-04-04T10:00:00.000Z"),
