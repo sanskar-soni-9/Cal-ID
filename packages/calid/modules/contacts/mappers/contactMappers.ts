@@ -7,7 +7,7 @@ import type {
   ContactRow,
   ContactUpdateInput,
 } from "../types";
-import { getContactInitials } from "../utils/contactUtils";
+import { getContactInitials, getContactSecondaryPhones } from "../utils/contactUtils";
 
 const parseDate = (value: Date | string) => {
   if (value instanceof Date) {
@@ -22,6 +22,7 @@ export const mapContactRowToContact = (row: ContactRow): Contact => ({
   name: row.name,
   email: row.email,
   phone: row.phone,
+  secondaryPhones: getContactSecondaryPhones(row.metadata, row.phone),
   notes: row.notes,
   avatar: getContactInitials(row.name),
   createdAt: parseDate(row.createdAt),

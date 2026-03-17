@@ -58,6 +58,17 @@ export const ContactProfileCard = ({
                 <span>{contact.phone}</span>
               </div>
             ) : null}
+            {contact.secondaryPhones.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs font-medium">Secondary numbers</p>
+                {contact.secondaryPhones.map((phone) => (
+                  <div key={phone} className="flex items-center gap-3 text-sm">
+                    <Phone className="text-muted-foreground h-4 w-4 shrink-0" />
+                    <span>{phone}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <Separator className="my-4" />

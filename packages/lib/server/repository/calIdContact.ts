@@ -13,6 +13,7 @@ const calIdContactSelect = {
   name: true,
   email: true,
   phone: true,
+  metadata: true,
   notes: true,
   createdAt: true,
   updatedAt: true,

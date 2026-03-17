@@ -5,6 +5,7 @@ CREATE TABLE "CalIdContact" (
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "phone" TEXT NOT NULL DEFAULT '',
+    "metadata" JSONB,
     "notes" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

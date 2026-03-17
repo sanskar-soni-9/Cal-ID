@@ -2877,6 +2877,7 @@ model CalIdContact {
   name      String
   email     String
   phone     String   @default("")
+  metadata  Json?
   notes     String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

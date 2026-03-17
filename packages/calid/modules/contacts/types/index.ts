@@ -11,6 +11,7 @@ export interface Contact {
   name: string;
   email: string;
   phone: string;
+  secondaryPhones: string[];
   notes: string;
   avatar: string;
   createdAt: Date;
