@@ -16,13 +16,20 @@ import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
 import { isAttendeeInputRequired } from "@calcom/app-store/locations";
+import dayjs from "@calcom/dayjs";
 import { BookingFields } from "@calcom/features/bookings/Booker/components/BookEventForm/BookingFields";
-import { useTimePreferences } from "@calcom/features/bookings/lib";
+import {
+  createRecurringBooking,
+  mapRecurringBookingToMutationInput,
+  useTimePreferences,
+} from "@calcom/features/bookings/lib";
 import { SystemField } from "@calcom/features/bookings/lib/SystemField";
 import { createBooking } from "@calcom/features/bookings/lib/create-booking";
 import getBookingResponsesSchema from "@calcom/features/bookings/lib/getBookingResponsesSchema";
 import { getPaymentAppData } from "@calcom/lib/getPaymentAppData";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import { parseRecurringDates, processDate } from "@calcom/lib/parse-dates";
+import { getCountText, getFrequencyText, getRecurringFreq } from "@calcom/lib/recurringStrings";
 import { TimeFormat } from "@calcom/lib/timeFormat";
 import { trpc } from "@calcom/trpc/react";
 
@@ -108,6 +115,9 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
   const [selectedSlotTime, setSelectedSlotTime] = useState<string | null>(null);
   const [additionalGuests, setAdditionalGuests] = useState("");
   const [bookingErrorMessage, setBookingErrorMessage] = useState<string | null>(null);
+  const [recurringEventCount, setRecurringEventCount] = useState<number | null>(null);
+  const [recurringEventCountInput, setRecurringEventCountInput] = useState<string>("");
+  const [recurringEventCountWarning, setRecurringEventCountWarning] = useState<string | null>(null);
 
   const bookingFieldsForm = useForm<BookingFieldsFormValues>({
     defaultValues: {
@@ -139,6 +149,9 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
   );
 
   const selectedEventDetail = selectedEventQuery.data?.eventType;
+  const recurringEventConfig = selectedEventDetail?.recurringEvent ?? null;
+  const isRecurringEventType = recurringEventConfig !== null && typeof recurringEventConfig.freq === "number";
+  const recurringMaxCount = recurringEventConfig?.count ?? null;
 
   const bookingFieldsStepSource = useMemo(() => {
     if (!selectedEventDetail) {
@@ -191,6 +204,20 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
       responses: defaultBookingFieldResponses,
     });
   }, [bookingFieldsForm, defaultBookingFieldResponses]);
+
+  useEffect(() => {
+    if (!isRecurringEventType) {
+      setRecurringEventCount(null);
+      setRecurringEventCountInput("");
+      setRecurringEventCountWarning(null);
+      return;
+    }
+
+    const defaultRecurringCount = recurringMaxCount ?? 1;
+    setRecurringEventCount(defaultRecurringCount);
+    setRecurringEventCountInput(String(defaultRecurringCount));
+    setRecurringEventCountWarning(null);
+  }, [isRecurringEventType, recurringMaxCount, selectedEventId]);
 
   const selectedDateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
 
@@ -259,6 +286,91 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
       .sort((first, second) => first.time.localeCompare(second.time));
   }, [selectedDateKey, slotsQuery.data?.slots]);
 
+  const recurringPatternText = useMemo(() => {
+    if (!isRecurringEventType || !recurringEventConfig) {
+      return null;
+    }
+    const recurringDescription = getRecurringFreq({ t, recurringEvent: recurringEventConfig }).trim();
+    if (recurringDescription) {
+      return recurringDescription;
+    }
+    return getFrequencyText(recurringEventConfig.freq, recurringEventConfig.interval || 1);
+  }, [isRecurringEventType, recurringEventConfig, t]);
+
+  const recurringSummaryText = useMemo(() => {
+    if (
+      !isRecurringEventType ||
+      !recurringEventConfig ||
+      !selectedSlotTime ||
+      !recurringEventCount ||
+      recurringEventCountWarning
+    ) {
+      return null;
+    }
+
+    const formattedStart = processDate(
+      dayjs(selectedSlotTime).tz(userTimeZone),
+      i18n.language,
+      userTimeZone,
+      {
+        selectedTimeFormat: timeFormat,
+      }
+    );
+
+    const frequencyText = getFrequencyText(recurringEventConfig.freq, recurringEventConfig.interval || 1);
+    const countText = getCountText(recurringEventCount);
+    return `Repeats ${frequencyText} ${countText} starting from ${formattedStart}`;
+  }, [
+    i18n.language,
+    isRecurringEventType,
+    recurringEventConfig,
+    recurringEventCount,
+    recurringEventCountWarning,
+    selectedSlotTime,
+    timeFormat,
+    userTimeZone,
+  ]);
+
+  const recurringOccurrencePreview = useMemo(() => {
+    if (
+      !isRecurringEventType ||
+      !recurringEventConfig ||
+      !selectedSlotTime ||
+      !recurringEventCount ||
+      recurringEventCountWarning
+    ) {
+      return [];
+    }
+
+    try {
+      const [occurrenceDateStrings] = parseRecurringDates(
+        {
+          startDate: selectedSlotTime,
+          timeZone: userTimeZone,
+          recurringEvent: recurringEventConfig,
+          recurringCount: recurringEventCount,
+          selectedTimeFormat: timeFormat,
+        },
+        i18n.language
+      );
+
+      return occurrenceDateStrings.slice(0, 6);
+    } catch {
+      return [];
+    }
+  }, [
+    i18n.language,
+    isRecurringEventType,
+    recurringEventConfig,
+    recurringEventCount,
+    recurringEventCountWarning,
+    selectedSlotTime,
+    timeFormat,
+    userTimeZone,
+  ]);
+  const isRecurringSelectionValid =
+    !isRecurringEventType || (Boolean(recurringEventCount) && !recurringEventCountWarning);
+
   const unsupportedReason = useMemo(() => {
     if (!selectedEventDetail || !contact) {
       return null;
@@ -311,6 +423,23 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
     },
   });
 
+  const createRecurringBookingMutation = useMutation({
+    mutationFn: createRecurringBooking,
+    async onSuccess() {
+      if (!contact) {
+        return;
+      }
+
+      await Promise.all([
+        utils.viewer.calIdContacts.list.invalidate(),
+        utils.viewer.calIdContacts.getById.invalidate({ id: contact.id }),
+        utils.viewer.calIdContacts.getMeetingsByContactId.invalidate({ contactId: contact.id }),
+      ]);
+    },
+  });
+  const isAnyBookingMutationPending =
+    createBookingMutation.isPending || createRecurringBookingMutation.isPending;
+
   const resetAndClose = (nextOpen: boolean) => {
     if (!nextOpen) {
       setStep(EVENT_TYPE_STEP);
@@ -320,8 +449,12 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
       setSelectedSlotTime(null);
       setAdditionalGuests("");
       setBookingErrorMessage(null);
+      setRecurringEventCount(null);
+      setRecurringEventCountInput("");
+      setRecurringEventCountWarning(null);
       bookingFieldsForm.reset({ responses: {} });
       createBookingMutation.reset();
+      createRecurringBookingMutation.reset();
     }
 
     onOpenChange(nextOpen);
@@ -385,6 +518,38 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
     }
 
     setStep(GUESTS_STEP);
+  };
+
+  const handleRecurringCountInputChange = (value: string) => {
+    setRecurringEventCountInput(value);
+
+    if (!isRecurringEventType) {
+      setRecurringEventCount(null);
+      setRecurringEventCountWarning(null);
+      return;
+    }
+
+    const parsedValue = Number.parseInt(value, 10);
+    if (!value || Number.isNaN(parsedValue)) {
+      setRecurringEventCount(null);
+      setRecurringEventCountWarning("Please enter a valid occurrence count.");
+      return;
+    }
+
+    if (parsedValue < 1) {
+      setRecurringEventCount(parsedValue);
+      setRecurringEventCountWarning("Occurrence count must be at least 1.");
+      return;
+    }
+
+    if (recurringMaxCount && parsedValue > recurringMaxCount) {
+      setRecurringEventCount(parsedValue);
+      setRecurringEventCountWarning(`Enter a value between 1 and ${recurringMaxCount}.`);
+      return;
+    }
+
+    setRecurringEventCount(parsedValue);
+    setRecurringEventCountWarning(null);
   };
 
   const handleConfirm = async () => {
@@ -483,25 +648,66 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
     const username = selectedEventDetail?.users.at(0)?.username || undefined;
 
     try {
-      await createBookingMutation.mutateAsync({
-        eventTypeId: selectedEventInfo.id,
-        eventTypeSlug: selectedEventInfo.slug,
-        user: username ?? undefined,
-        start: selectedStart.toISOString(),
-        end: addMinutes(selectedStart, duration).toISOString(),
-        timeZone: userTimeZone,
-        language: i18n.language || "en",
-        metadata: {},
-        responses,
-      });
+      if (isRecurringEventType && recurringEventConfig) {
+        const finalRecurringCount =
+          recurringEventCount ?? recurringMaxCount ?? recurringEventConfig.count ?? null;
+        if (!finalRecurringCount || recurringEventCountWarning) {
+          setBookingErrorMessage("Please provide a valid occurrence count for this recurring event.");
+          setStep(DATE_TIME_STEP);
+          return;
+        }
 
-      triggerToast(
-        `Meeting with ${contact.name} confirmed for ${format(selectedStart, "PPP")} at ${format(
-          selectedStart,
-          timeFormat
-        )}.`,
-        "success"
-      );
+        const recurringBookingInput = mapRecurringBookingToMutationInput(
+          {
+            values: {
+              responses,
+            },
+            event: {
+              id: selectedEventInfo.id,
+              length: selectedEventDetail?.length ?? selectedEventInfo.length,
+              slug: selectedEventInfo.slug,
+              schedulingType: selectedEventDetail?.schedulingType,
+              recurringEvent: recurringEventConfig,
+            },
+            date: selectedSlotTime,
+            duration,
+            timeZone: userTimeZone,
+            language: i18n.language || "en",
+            rescheduleUid: undefined,
+            rescheduledBy: undefined,
+            username: username ?? "",
+            metadata: {},
+          },
+          finalRecurringCount
+        );
+
+        await createRecurringBookingMutation.mutateAsync([recurringBookingInput]);
+
+        triggerToast(
+          `Recurring meeting with ${contact.name} confirmed (${finalRecurringCount} occurrences).`,
+          "success"
+        );
+      } else {
+        await createBookingMutation.mutateAsync({
+          eventTypeId: selectedEventInfo.id,
+          eventTypeSlug: selectedEventInfo.slug,
+          user: username ?? undefined,
+          start: selectedStart.toISOString(),
+          end: addMinutes(selectedStart, duration).toISOString(),
+          timeZone: userTimeZone,
+          language: i18n.language || "en",
+          metadata: {},
+          responses,
+        });
+
+        triggerToast(
+          `Meeting with ${contact.name} confirmed for ${format(selectedStart, "PPP")} at ${format(
+            selectedStart,
+            timeFormat
+          )}.`,
+          "success"
+        );
+      }
 
       resetAndClose(false);
     } catch (error) {
@@ -733,6 +939,63 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
                 ) : null}
               </div>
             ) : null}
+            {isRecurringEventType ? (
+              <div className="space-y-2 rounded-lg border px-3 py-3">
+                <div className="space-y-1">
+                  <Label>Recurrence</Label>
+                  {recurringPatternText ? (
+                    <p className="text-muted-foreground text-xs capitalize">{recurringPatternText}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">
+                      This event repeats on a recurring schedule.
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="recurring-count">Occurrences</Label>
+                  <Input
+                    id="recurring-count"
+                    type="number"
+                    min={1}
+                    max={recurringMaxCount ?? undefined}
+                    value={recurringEventCountInput}
+                    onChange={(event) => handleRecurringCountInputChange(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (["-", "+", "e", "E"].includes(event.key)) {
+                        event.preventDefault();
+                      }
+                    }}
+                    className="max-w-[120px]"
+                  />
+                  {recurringMaxCount ? (
+                    <p className="text-muted-foreground text-xs">Choose between 1 and {recurringMaxCount}.</p>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">Choose how many occurrences to schedule.</p>
+                  )}
+                  {recurringEventCountWarning ? (
+                    <p className="text-xs text-amber-700">{recurringEventCountWarning}</p>
+                  ) : null}
+                </div>
+                {recurringSummaryText ? <p className="text-xs font-medium">{recurringSummaryText}</p> : null}
+                {recurringOccurrencePreview.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs">Upcoming occurrences</p>
+                    <ul className="space-y-1 text-xs">
+                      {recurringOccurrencePreview.map((occurrence, index) => (
+                        <li key={`${occurrence}-${index}`} className="text-muted-foreground">
+                          {occurrence}
+                        </li>
+                      ))}
+                      {recurringEventCount && recurringEventCount > recurringOccurrencePreview.length ? (
+                        <li className="text-muted-foreground">
+                          + {recurringEventCount - recurringOccurrencePreview.length} more
+                        </li>
+                      ) : null}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex justify-between pt-2">
               <Button
@@ -744,7 +1007,9 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back
               </Button>
               <Button
-                disabled={!selectedDate || !selectedDuration || !selectedSlotTime}
+                disabled={
+                  !selectedDate || !selectedDuration || !selectedSlotTime || !isRecurringSelectionValid
+                }
                 onClick={() => {
                   setBookingErrorMessage(null);
                   setStep(hasExtendedBookingFields ? BOOKING_FIELDS_STEP : GUESTS_STEP);
@@ -876,6 +1141,20 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
                     {selectedDuration ?? selectedEventDetail?.length ?? 0} min
                   </span>
                 </div>
+                {isRecurringEventType ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Recurrence</span>
+                      <span className="text-right text-xs font-medium capitalize">
+                        {recurringPatternText || "Recurring"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Occurrences</span>
+                      <span className="font-medium">{recurringEventCount ?? recurringMaxCount ?? "-"}</span>
+                    </div>
+                  </>
+                ) : null}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Contact</span>
                   <span className="font-medium">{contact?.name}</span>
@@ -899,8 +1178,8 @@ export const ScheduleMeetingModal = ({ open, onOpenChange, contact }: ScheduleMe
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back
               </Button>
               <Button
-                loading={createBookingMutation.isPending}
-                disabled={createBookingMutation.isPending || Boolean(unsupportedReason)}
+                loading={isAnyBookingMutationPending}
+                disabled={isAnyBookingMutationPending || Boolean(unsupportedReason)}
                 onClick={handleConfirm}>
                 <Check className="mr-1 h-3.5 w-3.5" /> Confirm Booking
               </Button>
