@@ -225,7 +225,7 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
           />
         </div>
 
-        <div className={`space-y-6 ${isMobile ? "" : "col-span-2"}`}>
+        <div className={isMobile ? "space-y-6" : "col-span-2 grid gap-6 overflow-hidden"}>
           <MeetingsSection
             title={
               <>
@@ -237,6 +237,7 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
             countBadge
             isLoading={meetingsQuery.isLoading}
             errorMessage={meetingsQuery.isError ? meetingsQuery.error.message : null}
+            className={isMobile ? undefined : "min-h-0 overflow-hidden"}
           />
 
           <MeetingsSection
@@ -249,6 +250,7 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
             emptyLabel="No meeting history found for this contact"
             isLoading={meetingsQuery.isLoading}
             errorMessage={meetingsQuery.isError ? meetingsQuery.error.message : null}
+            className={isMobile ? undefined : "min-h-0 overflow-hidden"}
           />
         </div>
       </div>

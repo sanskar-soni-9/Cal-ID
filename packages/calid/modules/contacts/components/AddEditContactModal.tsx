@@ -121,7 +121,7 @@ export const AddEditContactModal = ({
               id="contact-name"
               value={form.name}
               onChange={(event) => updateField("name", event.target.value)}
-              placeholder="e.g. Sarah Chen"
+              placeholder="e.g. John Doe"
               className={errors.name ? "border-destructive" : ""}
             />
             {errors.name ? <p className="text-destructive text-xs">{errors.name}</p> : null}
@@ -136,7 +136,7 @@ export const AddEditContactModal = ({
               type="email"
               value={form.email}
               onChange={(event) => updateField("email", event.target.value)}
-              placeholder="e.g. sarah@acme.com"
+              placeholder="e.g. john@gmail.com"
               readOnly={isEditMode}
               className={`${errors.email ? "border-destructive" : ""} ${
                 isEditMode ? "bg-muted cursor-not-allowed" : ""
@@ -151,7 +151,7 @@ export const AddEditContactModal = ({
               id="contact-phone"
               value={form.phone}
               onChange={(event) => updateField("phone", event.target.value)}
-              placeholder="+1 (555) 000-0000"
+              placeholder="+91 98xxxxxxx"
             />
           </div>
 

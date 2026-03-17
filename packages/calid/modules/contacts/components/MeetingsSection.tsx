@@ -1,3 +1,4 @@
+import { cn } from "@calid/features/lib/cn";
 import { Badge } from "@calid/features/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@calid/features/ui/components/card";
 
@@ -11,6 +12,7 @@ interface MeetingsSectionProps {
   countBadge?: boolean;
   isLoading?: boolean;
   errorMessage?: string | null;
+  className?: string;
 }
 
 export const MeetingsSection = ({
@@ -20,10 +22,11 @@ export const MeetingsSection = ({
   countBadge = false,
   isLoading = false,
   errorMessage = null,
+  className,
 }: MeetingsSectionProps) => {
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className={cn("flex h-full min-h-0 flex-col", className)}>
+      <CardHeader className="shrink-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           {title}
           {countBadge && meetings.length > 0 ? (
@@ -33,20 +36,22 @@ export const MeetingsSection = ({
           ) : null}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-muted-foreground py-4 text-center text-sm">Loading meetings...</p>
-        ) : errorMessage ? (
-          <p className="text-destructive py-4 text-center text-sm">{errorMessage}</p>
-        ) : meetings.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-center text-sm">{emptyLabel}</p>
-        ) : (
-          <div className="space-y-2">
-            {meetings.map((meeting) => (
-              <MeetingCard key={meeting.id} meeting={meeting} />
-            ))}
-          </div>
-        )}
+      <CardContent className="min-h-0 flex-1">
+        <div className="h-full min-h-0 overflow-y-auto pr-1">
+          {isLoading ? (
+            <p className="text-muted-foreground py-4 text-center text-sm">Loading meetings...</p>
+          ) : errorMessage ? (
+            <p className="text-destructive py-4 text-center text-sm">{errorMessage}</p>
+          ) : meetings.length === 0 ? (
+            <p className="text-muted-foreground py-4 text-center text-sm">{emptyLabel}</p>
+          ) : (
+            <div className="space-y-2">
+              {meetings.map((meeting) => (
+                <MeetingCard key={meeting.id} meeting={meeting} />
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
