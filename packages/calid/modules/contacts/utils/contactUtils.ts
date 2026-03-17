@@ -1,5 +1,3 @@
-import type { Contact } from "../types";
-
 export const getContactInitials = (name: string) =>
   name
     .split(" ")
@@ -9,12 +7,27 @@ export const getContactInitials = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
-export const createAvailabilityShareLink = (contact: Contact) => {
-  const slug = contact.name.trim().toLowerCase().replace(/\s+/g, "-");
+type CreateAvailabilityShareLinkInput = {
+  bookerUrl: string;
+  eventSlug: string;
+  username?: string | null;
+  teamSlug?: string | null;
+  isOrgTeam?: boolean;
+};
 
-  if (typeof window === "undefined") {
-    return `https://cal.id/${slug}`;
+export const createAvailabilityShareLink = ({
+  bookerUrl,
+  eventSlug,
+  username,
+  teamSlug,
+  isOrgTeam = false,
+}: CreateAvailabilityShareLinkInput) => {
+  const normalizedBookerUrl = bookerUrl.replace(/\/+$/, "");
+  const ownerPath = teamSlug ? (isOrgTeam ? teamSlug : `team/${teamSlug}`) : username ? username : null;
+
+  if (!ownerPath || !eventSlug) {
+    return "";
   }
 
-  return `${window.location.origin}/${slug}`;
+  return `${normalizedBookerUrl}/${ownerPath}/${eventSlug}`;
 };
