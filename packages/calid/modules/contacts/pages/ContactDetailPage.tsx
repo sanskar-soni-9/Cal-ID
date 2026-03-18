@@ -26,19 +26,19 @@ interface ContactDetailPageProps {
   contactId: string;
 }
 
-const sortMeetingsByStartTimeDesc = (first: ContactMeeting, second: ContactMeeting, isDesc = true) => {
+const sortMeetingsByStartTimeDesc = (first: ContactMeeting, second: ContactMeeting) => {
   const timeDiff = second.date.getTime() - first.date.getTime();
   if (timeDiff !== 0) {
-    return isDesc ? timeDiff : -timeDiff;
+    return timeDiff;
   }
 
   return second.id - first.id;
 };
 
-const sortMeetingsByStartTimeInc = (first: ContactMeeting, second: ContactMeeting, isDesc = true) => {
+const sortMeetingsByStartTimeInc = (first: ContactMeeting, second: ContactMeeting) => {
   const timeDiff = first.date.getTime() - second.date.getTime();
   if (timeDiff !== 0) {
-    return isDesc ? timeDiff : -timeDiff;
+    return timeDiff;
   }
 
   return first.id - second.id;
@@ -83,14 +83,22 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
         .sort(sortMeetingsByStartTimeDesc),
     [meetingsQuery.data?.rows, numericContactId]
   );
-
+  const currentTime = Date.now();
   const upcomingMeetings = useMemo(
     () => meetings.filter((meeting) => meeting.status === "upcoming").sort(sortMeetingsByStartTimeInc),
     [meetings]
   );
+
   const pastMeetings = useMemo(
-    () => meetings.filter((meeting) => meeting.status !== "upcoming").sort(sortMeetingsByStartTimeDesc),
-    [meetings]
+    () =>
+      meetings
+        .filter(
+          (meeting) =>
+            meeting.status !== "upcoming" &&
+            meeting.date.getTime() + meeting.duration * 60 * 1000 < currentTime
+        )
+        .sort(sortMeetingsByStartTimeDesc),
+    [meetings, currentTime]
   );
 
   const [notes, setNotes] = useState("");
@@ -216,14 +224,6 @@ const ContactDetailPage = ({ contactId }: ContactDetailPageProps) => {
 
   return (
     <div className="space-y-6">
-      <Button
-        color="minimal"
-        size="sm"
-        onClick={() => router.push("/contacts")}
-        className="text-muted-foreground -ml-2">
-        <ArrowLeft className="h-4 w-4" /> Contacts
-      </Button>
-
       <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
         <div className="space-y-6">
           <ContactProfileCard

@@ -18,15 +18,7 @@ export const ContactAvatar = ({ name, avatar, size = "md", className }: ContactA
       alt={name}
       size={size}
       className={className}
-      fallback={
-        <span
-          className={cn(
-            "text-primary bg-primary/10 flex h-full w-full items-center justify-center text-xs font-medium",
-            className
-          )}>
-          {fallbackText}
-        </span>
-      }
+      fallback={<span className={cn("text-primary font-semibold", className)}>{fallbackText}</span>}
     />
   );
 };

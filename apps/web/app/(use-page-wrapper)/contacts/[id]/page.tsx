@@ -29,7 +29,7 @@ const Page = async ({ params }: PageProps) => {
   }
 
   return (
-    <Shell heading={t("contacts")} subtitle={t("contacts_description")}>
+    <Shell heading={t("contacts")} subtitle={t("contacts_description")} backPath="/contacts">
       <ContactDetailPage contactId={parsed.data.id} />
     </Shell>
   );

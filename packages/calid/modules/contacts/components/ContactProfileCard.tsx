@@ -41,7 +41,7 @@ export const ContactProfileCard = ({
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
-            <ContactAvatar name={contact.name} avatar={contact.avatar} size="lg" className="mb-3" />
+            <ContactAvatar name={contact.name} avatar={contact.avatar} size="lg" />
             <h2 className="text-lg font-semibold">{contact.name}</h2>
           </div>
 
