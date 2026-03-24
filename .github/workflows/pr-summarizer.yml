@@ -177,7 +177,7 @@ jobs:
 
                         ---
 
-                        2. PRODUCE TWO SECTIONS:
+                        2. PRODUCE ONLY THESE TWO SECTIONS:
 
                         ### 1. Product Impact
                         - ONLY include if there is clear, direct, user-visible impact
@@ -199,7 +199,6 @@ jobs:
                         FORMAT (STRICT MARKDOWN):
 
                         ## 🧠 PR Summary
-
                         ### ✨ Product Impact
                         <content OR "No relevant changes.">
 
