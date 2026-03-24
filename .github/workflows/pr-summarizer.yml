@@ -96,7 +96,7 @@ jobs:
                 File: ${f.filename}
                 Status: ${f.status}
                 Patch:
-                ${f.patch ?? 'No diff available'}
+                ${f.patch?.slice(0, 600) ?? 'No diff available'}
               `).join('\n\n');
 
               const res = await fetchWithRetry(
