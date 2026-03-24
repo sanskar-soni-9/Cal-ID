@@ -78,6 +78,7 @@ jobs:
 
                 } catch (err) {
                   const waitTime = Math.pow(2, attempt) * 8000;
+                  console.log(err);
                   console.log(`Rate limited. Retrying in ${waitTime / 1000}s...`);
 
                   await new Promise(r => setTimeout(r, waitTime));
