@@ -31,6 +31,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GH_MODEL_TOKEN }}
+          INFERENCE_MODEL: ${{ vars.GH_SUMMARIZING_MODEL }}
         with:
           script: |
             let pr;
@@ -47,25 +48,68 @@ jobs:
             } else {
               pr = context.payload.pull_request;
             }
+            if (pr.head.ref.startsWith("lingo.dev/")) {
+              return;
+            }
 
             const inferenceEndpoint = "https://models.github.ai/inference/chat/completions";
 
-            const files = await github.paginate(
-              github.rest.pulls.listFiles,
-              {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-                per_page: 100,
-              }
-            );
+            const preparedLabels = pr.labels
+              .map((label) => `${label.name}:${label.description}`)
+              .join("\n\n");
+
+            console.log(`preparedLabels: ${preparedLabels}`);
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
 
             console.log(`Total files: ${files.length}`);
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+
+            const imageRegex = /!\[.*?\]\(.*?\)|<img\s+[^>]*src=["'][^"']+["'][^>]*>/gi;
+            const commentsWithImages = comments
+              .filter((comment) => imageRegex.test(comment.body || ""))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const COMMENT_SNIPPET_RADIUS = 25; // characters before and after found image
+            const snippets = [];
+            for (const comment of commentsWithImages) {
+              const body = comment.body || "";
+
+              imageRegex.lastIndex = 0;
+
+              let match;
+              while ((match = imageRegex.exec(body)) !== null) {
+                const start = Math.max(0, match.index - COMMENT_SNIPPET_RADIUS);
+                const end = Math.min(
+                  body.length,
+                  match.index + match[0].length + COMMENT_SNIPPET_RADIUS,
+                );
+
+                const snippet = body.slice(start, end);
+
+                snippets.push(`[${comment.created_at}]: ...${snippet}...`);
+              }
+            }
+
+            const preparedComments = snippets.join("\n\n").slice(0, 1500);
+
+            console.log(`preparedComments: ${preparedComments}`);
 
             const batchSize = 10;
             const fileSummaries = [];
 
-            async function fetchWithRetry(url, options, retries=5) {
+            async function fetchWithRetry(url, options, retries = 5) {
               for (let attempt = 0; attempt < retries; attempt++) {
                 const res = await fetch(url, options);
 
@@ -76,13 +120,12 @@ jobs:
                   }
 
                   return await res.json();
-
                 } catch (err) {
                   const waitTime = Math.pow(2, attempt) * 8000;
                   console.log(res, err);
                   console.log(`Rate limited. Retrying in ${waitTime / 1000}s...`);
 
-                  await new Promise(r => setTimeout(r, waitTime));
+                  await new Promise((r) => setTimeout(r, waitTime));
                 }
               }
 
@@ -92,29 +135,31 @@ jobs:
             for (let i = 0; i < files.length; i += batchSize) {
               const batch = files.slice(i, i + batchSize);
 
-              const prompt = batch.map(f => `
+              const prompt = batch
+                .map(
+                  (f) => `
                 File: ${f.filename}
                 Status: ${f.status}
                 Patch:
-                ${f.patch?.slice(0, 1500) ?? 'No diff available'}
-              `).join('\n\n');
+                ${f.patch?.slice(0, 1500) ?? "No diff available"}
+              `,
+                )
+                .join("\n\n");
 
-              const data = await fetchWithRetry(
-                inferenceEndpoint,
-                {
-                  method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    model: "gpt-4.1-mini",
-                    messages: [
-                      {
-                        role: "system",
-                        content: `
+              const data = await fetchWithRetry(inferenceEndpoint, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: `${process.env.INFERENCE_MODEL}`,
+                  messages: [
+                    {
+                      role: "system",
+                      content: `
                           # Role
-                          You are an ultra-concise git diff parser. Your job is to compress file changes into hyper-dense "information nuggets" for a downstream machine reader. 
+                          You are an ultra-concise git diff parser. Your job is to compress file changes into hyper-dense "information nuggets" for a downstream machine reader.
 
                           # Goal
                           Produce the absolute minimum text required to convey functional changes. Save token space.
@@ -129,7 +174,7 @@ jobs:
 
                           # ✂️ Compression Rules
                           Apply these rules aggressively to minimize token usage:
-                          1. **Telegram Style:** Remove articles (a, an, the) and conjunctions where possible. 
+                          1. **Telegram Style:** Remove articles (a, an, the) and conjunctions where possible.
                           2. **Functional Focus:** Ignore whitespace, formatting, variable renames, and imports. Document only logic shifts.
                           3. **No Code:** Do not wrap keywords in backticks (\`) or include code snippets.
                           4. **Limits:** Maximum 1 to 2 lines per file. Under 15 words per line.
@@ -145,21 +190,20 @@ jobs:
                           Option 2: For relevant files, output only the bullet points:
                           - [Short functional change 1]
                           - [Short functional change 2]
-                        `
-                      },
-                      {
-                        role: "user",
-                        content: prompt
-                      }
-                    ],
-                    max_tokens: 800,
-                  }),
-                }
-              );
+                        `,
+                    },
+                    {
+                      role: "user",
+                      content: prompt,
+                    },
+                  ],
+                  max_tokens: 800,
+                }),
+              });
 
               const summary = data.choices?.[0]?.message?.content || "";
 
-              console.log(summary)
+              console.log(summary);
               fileSummaries.push(summary);
 
               await new Promise((res) => setTimeout(res, 10 * 1000));
@@ -167,22 +211,20 @@ jobs:
 
             const combinedSummaries = fileSummaries.join("\n\n").slice(0, 7000);
 
-            const finalRes = await fetch(
-              inferenceEndpoint,
-              {
-                method: "POST",
-                headers: {
-                  "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "gpt-4.1-mini",
-                  messages: [
-                    {
-                      role: "system",
-                      content: `
+            const finalData = await fetchWithRetry(inferenceEndpoint, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: `${process.env.INFERENCE_MODEL}`,
+                messages: [
+                  {
+                    role: "system",
+                    content: `
                         # Role
-                        You are a Senior Product Engineer and Product-Minded Communicator. Your goal is to curate meaningful, jargon-free product updates for end-users based on technical pull requests (PRs).
+                        You are a Senior Product Manager and Product-Minded Communicator. Your goal is to curate meaningful, concise, and 100% jargon-free product updates for non-technical end-users based on technical pull requests (PRs).
 
                         ---
 
@@ -190,7 +232,9 @@ jobs:
                         The user will provide the following inputs using these tags:
                         - <pr_title>Title of the PR</pr_title>
                         - <pr_description>Author-written description and context</pr_description>
+                        - <pr_labels>Labels attached to PR</pr_labels>
                         - <file_summaries>A list of file-level changes derived from code diffs</file_summaries>
+                        - <comments>A chronological list of comments on the PR, which may contain discussion, markdown images, or HTML image tags</comments>
 
                         ---
 
@@ -200,8 +244,9 @@ jobs:
                         ### ✅ INCLUDE (Has Product Impact)
                         - New user-facing features or capabilities
                         - UI/UX enhancements or visual changes
-                        - Significant user-facing performance improvements (e.g., "Dashboard loads 2x faster")
-                        - External API changes or breaking changes for developers
+                        - Significant user-facing performance improvements (e.g., "Dashboard loads noticeably faster")
+                        - Critical bug fixes that resolve visible, user-facing issues
+                        - Higher priority for bug fixes that impact your end-users' own customers (e.g., meeting attendees, guest participants, or external viewers)
 
                         ### ❌ IGNORE (Internal / No Product Impact)
                         - CI/CD pipelines, GitHub Actions, workflow automation
@@ -209,13 +254,16 @@ jobs:
                         - Testing infrastructure, jest/pytest additions
                         - Internal code refactoring, linter fixes, or structural cleanup
                         - Internal logging, telemetry, or metric additions
+                        - Backend jobs, database migrations, or webhook infrastructure that do not immediately change the user interface/experience.
 
                         ---
 
                         # Rules of Interpretation
                         1. **Truth Source:** Trust <file_summaries> most for what actually happened. Trust <pr_description> for why it happened.
                         2. **Conflicting Data:** If code diffs do not match the description's claims, prioritize the code diffs.
-                        3. **Language:** Translate technical jargon into outcome-driven language. (e.g., Instead of "Updated OAuth2 callback endpoints," use "Fixed an issue where logging in via Google would occasionally fail.")
+                        3. **End-User Language Only (CRITICAL):** Write exactly as you would for a customer release note. NEVER mention how a feature was built. Strip away ALL technical terms. Focus strictly on what the user can now *see* or *do*. 
+                        4. **Brevity:** Keep the impact summary to a maximum of 2 to 3 punchy points.
+                        5. **Feature Images from Comments:** If the PR introduces a new feature or visual UI change, scan the <comments> for images (e.g., Markdown images \`![alt text](url)\` or HTML \`<img>\` tags). Extract the latest/most recent relevant image that demonstrates the feature to include in the output.
 
                         ---
 
@@ -223,7 +271,7 @@ jobs:
 
                         Determine if the PR has a product impact. Choose ONLY ONE of the two output branches below:
 
-                        ### Branch A: If the PR has NO product impact (Internal/CI/CD/Tests)
+                        ### Branch A: If the PR has NO product impact (Internal/CI/CD/Tests/Backend infra)
                         Output exactly this and nothing else:
                         No relevant product impact.
 
@@ -233,41 +281,44 @@ jobs:
                         ## 🧠 PR Summary
 
                         ### ✨ Product Impact
-                        - [Bullet point translating technical changes into user value, outcomes, or reliability improvements]
+                        - [A catchy, benefit-focused summary (max 2-3 bullets) highlighting what the user can now see or do. Translate technical jargon into direct outcomes.]
 
                         ### 🏷️ Classification
                         - **Type:** (Feature | Improvement | Bugfix)
                         - **Impact Level:** (Low | Medium | High)
-                      `
-                    },
-                    {
-                      role: "user",
-                      content: `
-                        <pr_title>${pr.title}</pr_title>
-                        <pr_description>${pr.body}</pr_description>
-                        <file_summaries>${combinedSummaries}</file_summaries>
 
-                        Follow best practices: concise, high-signal, no fluff.
-                      `
-                    }
-                  ],
-                  max_tokens: 1500,
-                }),
-              }
-            );
+                        ### Feature Image
+                        [Insert the raw markdown \`![alt](url)\` or HTML \`<img src="..." />\` tag of the latest relevant image found in the <comments> or <pr_description>. If no relevant image is found, or if the PR is not a visual feature, omit this "Feature Image" heading and section entirely.]
+                        `,
+                              },
+                              {
+                                role: "user",
+                                content: `
+                                  <pr_title>${pr.title}</pr_title>
+                                  <pr_description>${pr.body}</pr_description>
+                                  <pr_labels>${preparedLabels}</pr_labels>
+                                  <file_summaries>${combinedSummaries}</file_summaries>
+                                  <comments>${preparedComments}</comments>
 
-            const finalData = await finalRes.json();
-            console.log(finalData);
-            const finalSummary = finalData.choices?.[0]?.message?.content;
+                                  Follow best practices: concise, high-signal, no fluff.
+                                `,
+                              },
+                            ],
+                            max_tokens: 1500,
+                          }),
+                        });
 
-            console.log("\n\n\n")
-            console.log(finalSummary)
+                        console.log(finalData);
+                        const finalSummary = finalData.choices?.[0]?.message?.content;
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              body: finalSummary,
-            });
+                        console.log("\n\n\n");
+                        console.log(finalSummary);
 
-            console.log("PR summary posted!");
+                        await github.rest.issues.createComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: pr.number,
+                          body: finalSummary,
+                        });
+
+                        console.log("PR summary posted!");
