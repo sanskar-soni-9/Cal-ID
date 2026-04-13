@@ -289,6 +289,7 @@ jobs:
 
                         ### Feature Image
                         [Insert the raw markdown \`![alt](url)\` or HTML \`<img src="..." />\` tag of the latest relevant image found in the <comments> or <pr_description>. If no relevant image is found, or if the PR is not a visual feature, omit this "Feature Image" heading and section entirely.]
+                        [If image not found then keep the ### Feature Image heading as is and this section blank for features]
                         `,
                               },
                               {
